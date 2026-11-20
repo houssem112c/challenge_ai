@@ -16,7 +16,7 @@ export class AuthService {
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new BadRequestException('An account already exists with this email');
     const otp = crypto.randomInt(100000, 999999).toString();
-    await this.prisma.user.create({
+    const createdUser = await this.prisma.user.create({
       data: {
         name: input.name,
         email,
@@ -27,7 +27,12 @@ export class AuthService {
         emailVerified: false,
       },
     });
-    await this.sendOtp(email, otp);
+    try {
+      await this.sendOtp(email, otp);
+    } catch (error) {
+      await this.prisma.user.delete({ where: { id: createdUser.id } });
+      throw error;
+    }
     return { message: 'Account created. Enter the OTP sent to your email.' };
   }
 
@@ -128,6 +133,9 @@ export class AuthService {
       host: process.env.SMTP_HOST,
       port: isValidPort,
       secure: process.env.SMTP_SECURE === 'true',
+      connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS ?? 15000),
+      greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS ?? 15000),
+      socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS ?? 20000),
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
     });
     try {
