@@ -1,0 +1,1 @@
+export const challengeGenerationPrompt = 'Generate a clear, solvable challenge and return structured JSON.';

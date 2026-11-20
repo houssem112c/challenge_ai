@@ -1,0 +1,1 @@
+export const evaluationPrompt = 'Evaluate the submission against the requirements and give actionable feedback.';

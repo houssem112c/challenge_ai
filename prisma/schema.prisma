@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ChallengeType {
+  PROGRAMMING
+  QCM
+  QA
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum SubmissionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum UserRole {
+  USER
+  COMPANY
+}
+
+model User {
+  id          String       @id @default(uuid())
+  name        String
+  email       String       @unique
+  passwordHash String?
+  role        UserRole     @default(USER)
+  emailVerified Boolean     @default(false)
+  otpCode     String?
+  otpExpires  DateTime?
+  refreshTokenHash String?
+  oauthProvider String?
+  oauthSubject String?
+  submissions Submission[]
+  createdChallenges Challenge[] @relation("ChallengeCreator")
+  createdAt   DateTime     @default(now())
+}
+
+model Challenge {
+  id          String         @id @default(uuid())
+  title       String
+  description String
+  domain      String
+  topic       String
+  type        ChallengeType
+  difficulty  Difficulty
+
+  starterCode String?
+  solution    String?
+  mission     String?
+  examples    Json?
+  options     Json?
+  answer      String?
+  evaluationCriteria Json?
+  creatorId   String?
+  creator     User?        @relation("ChallengeCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+
+  tests       TestCase[]
+  submissions Submission[]
+
+  createdAt   DateTime       @default(now())
+}
+
+model TestCase {
+  id          String    @id @default(uuid())
+  challengeId String
+  input       Json
+  expected    Json
+  hidden      Boolean   @default(false)
+
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+}
+
+model Submission {
+  id          String           @id @default(uuid())
+  userId      String
+  challengeId String
+
+  answer      String
+  score       Float?
+  status      SubmissionStatus @default(PENDING)
+
+  executionMs Int?
+  feedback    String?
+
+  user        User       @relation(fields: [userId], references: [id])
+  challenge   Challenge  @relation(fields: [challengeId], references: [id])
+  testResults TestResult[]
+
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, challengeId])
+}
+
+model TestResult {
+  id           String @id @default(uuid())
+  submissionId String
+  testCaseId   String
+
+  passed       Boolean
+  actual       Json?
+  expected     Json?
+  executionMs  Int?
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+}
