@@ -115,22 +115,32 @@ export class AuthService {
   }
 
   private async sendOtp(email: string, otp: string) {
-    if (!process.env.SMTP_HOST) {
-      console.log(`[OTP] ${email}: ${otp}`);
-      return;
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+      throw new BadRequestException('Email service is not configured');
     }
+
+    const isValidPort = Number(process.env.SMTP_PORT ?? 587);
+    if (!Number.isInteger(isValidPort) || isValidPort < 1) {
+      throw new BadRequestException('Email service port is invalid');
+    }
+
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT ?? 587),
+      port: isValidPort,
       secure: process.env.SMTP_SECURE === 'true',
-      auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD } : undefined,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
     });
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
-      to: email,
-      subject: 'Verify your CodeQuest account',
-      text: `Your CodeQuest verification code is ${otp}. It expires in 10 minutes.`,
-      html: `<p>Your CodeQuest verification code is <b>${otp}</b>.</p><p>It expires in 10 minutes.</p>`,
-    });
+    try {
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM ?? process.env.SMTP_USER,
+        to: email,
+        subject: 'Verify your CodeQuest account',
+        text: `Your CodeQuest verification code is ${otp}. It expires in 10 minutes.`,
+        html: `<p>Your CodeQuest verification code is <b>${otp}</b>.</p><p>It expires in 10 minutes.</p>`,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Unknown SMTP error';
+      throw new BadRequestException(`Could not send verification email: ${detail}`);
+    }
   }
 }
