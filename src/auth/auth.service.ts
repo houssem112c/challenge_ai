@@ -120,6 +120,32 @@ export class AuthService {
   }
 
   private async sendOtp(email: string, otp: string) {
+    if (process.env.RESEND_API_KEY) {
+      try {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: process.env.MAIL_FROM ?? 'CodeQuest <onboarding@resend.dev>',
+            to: [email],
+            subject: 'Verify your CodeQuest account',
+            text: `Your CodeQuest verification code is ${otp}. It expires in 10 minutes.`,
+            html: `<p>Your CodeQuest verification code is <b>${otp}</b>.</p><p>It expires in 10 minutes.</p>`,
+          }),
+        });
+        if (response.ok) return;
+
+        const body = await response.text();
+        throw new Error(`Resend rejected the email (${response.status}): ${body}`);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : 'Unknown email provider error';
+        throw new BadRequestException(`Could not send verification email: ${detail}`);
+      }
+    }
+
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
       throw new BadRequestException('Email service is not configured');
     }
